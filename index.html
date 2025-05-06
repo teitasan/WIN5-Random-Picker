@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WIN5ピッカー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを適用 */
+        body {
+            font-family: 'Inter', sans-serif;
+            /* 背景: 芝生風グラデーション */
+            background: linear-gradient(to bottom right, #a7f3d0, #6ee7b7); /* Emerald 200 to 300 */
+        }
+        /* ボタンのローディング状態 */
+        .button-loading { cursor: not-allowed; opacity: 0.7; }
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff;
+            width: 16px; height: 16px; animation: spin 1s linear infinite; margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- スロット演出用CSS (競馬テーマ) --- */
+        .slots-container {
+            display: flex; justify-content: center; gap: 12px;
+            margin-bottom: 1.5rem; perspective: 500px; flex-wrap: wrap;
+            padding: 10px;
+        }
+        .slot-wrapper { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.5rem; }
+        .slot-label {
+            font-size: 0.8rem; font-weight: 600; color: #374151; /* Gray 700 */ margin-bottom: 4px;
+            text-shadow: 0 1px 1px rgba(255,255,255,0.5);
+        }
+        .slot {
+            width: 70px; height: 100px;
+            /* 枠線: 茶色系 */
+            border: 4px solid #a16207; /* Amber 700 */
+            border-radius: 12px;
+            /* 背景: 芝生風グラデーション */
+            background: linear-gradient(145deg, #d1fae5, #a7f3d0); /* Emerald 100 to 200 */
+            overflow: hidden; position: relative; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; font-weight: bold; color: #1f2937; /* Gray 800 */
+            box-shadow: inset 0 3px 6px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.2);
+            transform-style: preserve-3d;
+            transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55),
+                        border-color 0.3s, box-shadow 0.3s;
+        }
+        /* スロット上部のハイライト (少し調整) */
+        .slot::before {
+            content: ''; position: absolute; top: 3px; left: 10%; width: 80%; height: 6px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.7), rgba(255,255,255,0));
+            border-radius: 50% / 100%; border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+            opacity: 0.7;
+        }
+
+        .slot.rolling {
+             border-color: #9ca3af; /* Gray 400 */
+             background: linear-gradient(145deg, #e5e7eb, #d1d5db); /* Gray 200 to 300 */
+             box-shadow: inset 0 2px 4px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .slot.stopped {
+             border-color: #a16207; /* Amber 700 */
+             transform: scale(1.05);
+        }
+        .slot.stopped.settled {
+             transform: scale(1);
+        }
+
+        .slot-reel {
+            position: relative; width: 100%; text-align: center;
+            font-size: 3rem; line-height: 1.1;
+            color: #111827; /* Gray 900 */
+            transition: color 0.3s, text-shadow 0.3s;
+            text-shadow: 1px 1px 0px #ffffff, -1px -1px 0px rgba(0,0,0,0.15); /* 影調整 */
+        }
+        .slot.rolling .slot-reel {
+             color: #9ca3af; /* Gray 400 */
+             text-shadow: none;
+        }
+        .slot-suffix {
+            font-size: 0.85rem; font-weight: 600;
+            color: #78350f; /* Amber 800 */
+            margin-top: -2px;
+            text-shadow: 0 1px 1px rgba(255,255,255,0.6);
+        }
+        /* --- スロット演出用CSS ここまで --- */
+
+        /* タイトル横のアイコン用スタイルは削除 */
+        /*
+        .title-icon { ... }
+        */
+
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-6 md:p-10 font-sans">
+    <div class="container mx-auto max-w-xl bg-gradient-to-br from-white to-gray-100 p-8 md:p-10 rounded-xl shadow-xl border border-gray-200">
+        <h1 class="text-3xl md:text-4xl font-bold mb-8 text-center text-green-800 tracking-tight">
+            WIN5ピッカー
+        </h1>
+
+        <div class="text-center mb-8 mt-8">
+            <button id="generate_button"
+                    class="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3 border border-transparent text-lg font-semibold rounded-lg shadow-lg text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition duration-150 ease-in-out transform hover:scale-105">
+                 <span id="button_spinner" class="spinner hidden"></span>
+                 <span id="button_text">買い目を生成</span>
+            </button>
+        </div>
+
+        <div id="result_area" class="mt-8 p-6 bg-gradient-to-b from-gray-50 to-gray-100 rounded-lg border border-gray-300 min-h-[260px]">
+            <h3 class="text-xl font-semibold mb-6 text-gray-700 text-center">生成結果</h3>
+            <div id="slots_container" class="slots-container mb-6">
+                <div class="slot-wrapper">
+                    <div class="slot-label">レース1</div>
+                    <div class="slot" id="slot_container_0">
+                        <span id="slot_0" class="slot-reel">-</span>
+                        <span class="slot-suffix">人気</span>
+                    </div>
+                </div>
+                <div class="slot-wrapper">
+                    <div class="slot-label">レース2</div>
+                    <div class="slot" id="slot_container_1">
+                        <span id="slot_1" class="slot-reel">-</span>
+                        <span class="slot-suffix">人気</span>
+                    </div>
+                </div>
+                <div class="slot-wrapper">
+                    <div class="slot-label">レース3</div>
+                    <div class="slot" id="slot_container_2">
+                        <span id="slot_2" class="slot-reel">-</span>
+                        <span class="slot-suffix">人気</span>
+                    </div>
+                </div>
+                 <div class="slot-wrapper">
+                    <div class="slot-label">レース4</div>
+                    <div class="slot" id="slot_container_3">
+                        <span id="slot_3" class="slot-reel">-</span>
+                        <span class="slot-suffix">人気</span>
+                    </div>
+                </div>
+                 <div class="slot-wrapper">
+                    <div class="slot-label">レース5</div>
+                    <div class="slot" id="slot_container_4">
+                        <span id="slot_4" class="slot-reel">-</span>
+                        <span class="slot-suffix">人気</span>
+                    </div>
+                </div>
+            </div>
+            <p id="result_message" class="text-center text-gray-800 text-lg mt-6 h-8 font-medium"></p>
+            <p id="error_message" class="text-sm text-red-600 mt-1 text-center"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- 定数定義 ---
+        const NUM_RACES = 5;
+        const MAX_RANK = 10;
+        const MIN_PROB = 0.1;
+        const MAX_ATTEMPTS = 100000;
+        const TARGET_SUM = 15;
+        const SLOT_ROLL_INTERVAL = 40;
+        const SLOT_STOP_DELAY = 400;
+
+        // --- 元のヒートマップに基づく確率データ ---
+        const probabilitiesRawFull = [
+            [31.9, 15.7, 19.9, 10.8, 9.0, 5.4, 5.4, 0, 0, 0, 0, 0, 1.9], // R1
+            [32.5, 31.3, 15.1, 7.2, 5.4, 0, 0, 0, 0, 0, 0, 0, 8.5],    // R2
+            [30.1, 22.3, 14.5, 11.4, 6.0, 6.0, 0, 0, 0, 0, 0, 0, 9.7], // R3
+            [29.5, 19.3, 12.1, 10.2, 8.4, 5.5, 5.4, 0, 0, 0, 0, 0, 9.6], // R4
+            [27.1, 25.3, 9.0, 12.1, 11.4, 9.6, 6.0, 0, 0, 0, 0, 0, 0],    // R5
+        ];
+
+        // --- 確率データの正規化 ---
+        const probabilitiesNormalized = probabilitiesRawFull.map((fullProbs, raceIdx) => {
+             const probs1to10 = fullProbs.slice(0, MAX_RANK);
+             const normalized = Array(MAX_RANK).fill(0);
+             const zeroIndices = [];
+             let sumNonZero = 0;
+             probs1to10.forEach((p, index) => {
+                 if (p <= 1e-9) { zeroIndices.push(index); } else { sumNonZero += p; }
+             });
+             const numZeros = zeroIndices.length;
+             const totalMinProb = numZeros * MIN_PROB;
+             if (totalMinProb >= 100.0) {
+                 console.warn(`Race ${raceIdx + 1}: Too many zeros or MIN_PROB too high. Using uniform distribution.`);
+                 return Array(MAX_RANK).fill(100.0 / MAX_RANK);
+             }
+             const remainingProb = 100.0 - totalMinProb;
+             let scaleFactor = 0;
+             if (sumNonZero > 1e-9) { scaleFactor = remainingProb / sumNonZero; }
+             else if (numZeros < MAX_RANK) {
+                  console.warn(`Race ${raceIdx + 1}: All original probs were zero, distributing remaining prob uniformly.`);
+                  const probPerNonZero = remainingProb / (MAX_RANK - numZeros);
+                  probs1to10.forEach((p, index) => { if (!zeroIndices.includes(index)) { normalized[index] = probPerNonZero; } });
+             }
+             probs1to10.forEach((p, index) => {
+                 if (zeroIndices.includes(index)) { normalized[index] = MIN_PROB; }
+                 else if (scaleFactor > 0) { normalized[index] = p * scaleFactor; }
+             });
+             let currentSum = normalized.reduce((sum, p) => sum + p, 0);
+             if (Math.abs(currentSum - 100.0) > 1e-9) {
+                  console.warn(`Race ${raceIdx + 1}: Final probability normalization needed adjustment. Sum: ${currentSum}`);
+                  const adjustFactor = 100.0 / currentSum;
+                  for(let i = 0; i < MAX_RANK; i++) { normalized[i] *= adjustFactor; }
+                  currentSum = normalized.reduce((sum, p) => sum + p, 0);
+                  if (Math.abs(currentSum - 100.0) > 1e-9) {
+                     const diff = 100.0 - currentSum;
+                     const firstNonMinProbIndex = normalized.findIndex(p => p > MIN_PROB * adjustFactor * 0.99);
+                     if(firstNonMinProbIndex !== -1) { normalized[firstNonMinProbIndex] += diff; }
+                     else { normalized[0] += diff; }
+                  }
+             }
+             return normalized;
+        });
+
+        // --- 累積確率の計算 ---
+        const cumulativeProbabilities = probabilitiesNormalized.map(normProbs => {
+            let cumulativeSum = 0;
+            return normProbs.map(p => { cumulativeSum += p; return cumulativeSum; });
+        });
+
+        // --- 重み付きランダム選択関数 ---
+        function weightedRandomChoice(raceIndex) {
+            const randomValue = Math.random() * 100;
+            const cumulative = cumulativeProbabilities[raceIndex];
+            for (let rankIndex = 0; rankIndex < MAX_RANK; rankIndex++) {
+                if (randomValue <= cumulative[rankIndex]) { return rankIndex + 1; }
+            }
+            console.error("Weighted random choice failed to select a rank (1-10).");
+            return Math.floor(Math.random() * MAX_RANK) + 1;
+        }
+
+        // --- メインの選択ロジック関数 ---
+        function pickPopularityRanks() {
+            let attempts = 0;
+            while (attempts < MAX_ATTEMPTS) {
+                attempts++;
+                const resultRanks = Array(NUM_RACES);
+                let currentSum = 0;
+                for (let i = 0; i < NUM_RACES; i++) {
+                    const chosenRank = weightedRandomChoice(i);
+                    resultRanks[i] = chosenRank;
+                    currentSum += chosenRank;
+                }
+                if (currentSum === TARGET_SUM) {
+                    return { result: resultRanks };
+                }
+            }
+            return { error: `${MAX_ATTEMPTS.toLocaleString()}回試行しましたが、合計が${TARGET_SUM}になる組み合わせが見つかりませんでした。` };
+        }
+
+        // --- DOM要素取得 ---
+        const generateButton = document.getElementById('generate_button');
+        const buttonText = document.getElementById('button_text');
+        const buttonSpinner = document.getElementById('button_spinner');
+        const resultMessage = document.getElementById('result_message');
+        const errorMessage = document.getElementById('error_message');
+        const slotReels = [];
+        const slotContainers = [];
+        for (let i = 0; i < NUM_RACES; i++) {
+            slotReels.push(document.getElementById(`slot_${i}`));
+            slotContainers.push(document.getElementById(`slot_container_${i}`));
+        }
+        let rollingIntervals = [];
+
+        // --- スロット演出関数 ---
+        function startSlotsRolling() {
+            rollingIntervals.forEach(clearInterval);
+            rollingIntervals = [];
+            slotReels.forEach((reel, index) => {
+                const container = slotContainers[index];
+                container.classList.remove('stopped', 'settled');
+                container.classList.add('rolling');
+                reel.textContent = '-';
+                const intervalId = setInterval(() => {
+                    reel.textContent = Math.floor(Math.random() * MAX_RANK) + 1;
+                }, SLOT_ROLL_INTERVAL);
+                rollingIntervals.push(intervalId);
+            });
+            resultMessage.textContent = '';
+            errorMessage.textContent = '';
+        }
+
+        function stopSlot(index, finalRank) {
+            if (rollingIntervals[index]) {
+                clearInterval(rollingIntervals[index]);
+                rollingIntervals[index] = null;
+            }
+            const reel = slotReels[index];
+            const container = slotContainers[index];
+            container.classList.remove('rolling');
+            container.classList.add('stopped');
+            reel.textContent = finalRank;
+            setTimeout(() => {
+                container.classList.add('settled');
+            }, 150);
+        }
+
+        function stopAllSlotsImmediately() {
+             rollingIntervals.forEach(clearInterval);
+             rollingIntervals = [];
+             slotReels.forEach((reel, index) => {
+                 const container = slotContainers[index];
+                 container.classList.remove('rolling');
+                 container.classList.add('stopped', 'settled');
+                 reel.textContent = '-';
+             });
+        }
+
+        // --- ボタンクリック時の処理 ---
+        generateButton.addEventListener('click', () => {
+            generateButton.disabled = true;
+            generateButton.classList.add('button-loading');
+            buttonText.textContent = '生成中...';
+            buttonSpinner.classList.remove('hidden');
+
+            startSlotsRolling();
+
+            setTimeout(() => {
+                const outcome = pickPopularityRanks();
+
+                if (outcome.error) {
+                    stopAllSlotsImmediately();
+                    errorMessage.textContent = outcome.error;
+                    resultMessage.textContent = 'エラーが発生しました。';
+                    generateButton.disabled = false;
+                    generateButton.classList.remove('button-loading');
+                    buttonText.textContent = '人気順を生成';
+                    buttonSpinner.classList.add('hidden');
+
+                } else if (outcome.result) {
+                    let stopDelay = 0;
+                    outcome.result.forEach((rank, index) => {
+                        setTimeout(() => {
+                            stopSlot(index, rank);
+                            if (index === NUM_RACES - 1) {
+                                setTimeout(() => {
+                                    resultMessage.textContent = `の馬を購入してください。`;
+                                    generateButton.disabled = false;
+                                    generateButton.classList.remove('button-loading');
+                                    buttonText.textContent = '人気順を生成';
+                                    buttonSpinner.classList.add('hidden');
+                                }, 200 + 150);
+                            }
+                        }, stopDelay);
+                        stopDelay += SLOT_STOP_DELAY;
+                    });
+                }
+            }, 500);
+        });
+
+    </script>
+
+</body>
+</html>
