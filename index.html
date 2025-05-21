@@ -151,6 +151,15 @@
             <p id="result_message" class="text-center text-gray-800 text-lg mt-6 h-8 font-medium"></p>
             <p id="error_message" class="text-sm text-red-600 mt-1 text-center"></p>
         </div>
+
+        <div id="history_area" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-300">
+            <button id="toggle_history_button" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                履歴を表示
+            </button>
+            <ul id="history_list" class="mt-4 list-disc pl-5 hidden">
+                <!-- History items will be added here by JavaScript -->
+            </ul>
+        </div>
     </div>
 
     <script>
@@ -162,6 +171,11 @@
         const TARGET_SUM = 15;
         const SLOT_ROLL_INTERVAL = 40;
         const SLOT_STOP_DELAY = 400;
+
+        // --- History constants ---
+        const MAX_HISTORY_ITEMS = 30;
+        const historyKey = 'win5PickerHistory';
+        let gameHistory = [];
 
         // --- 元のヒートマップに基づく確率データ ---
         const probabilitiesRawFull = [
@@ -263,7 +277,60 @@
             slotReels.push(document.getElementById(`slot_${i}`));
             slotContainers.push(document.getElementById(`slot_container_${i}`));
         }
+        const toggleHistoryButton = document.getElementById('toggle_history_button');
+        const historyList = document.getElementById('history_list');
         let rollingIntervals = [];
+
+        // --- History Functions ---
+        function loadHistory() {
+            try {
+                const storedHistory = localStorage.getItem(historyKey);
+                if (storedHistory) {
+                    gameHistory = JSON.parse(storedHistory);
+                } else {
+                    gameHistory = [];
+                }
+            } catch (error) {
+                console.error("Error loading history from localStorage:", error);
+                gameHistory = [];
+            }
+        }
+
+        function saveHistory() {
+            try {
+                const jsonString = JSON.stringify(gameHistory);
+                localStorage.setItem(historyKey, jsonString);
+            } catch (error) {
+                console.error("Error saving history to localStorage:", error);
+            }
+        }
+
+        function renderHistory() {
+            historyList.innerHTML = ''; // Clear existing items
+            if (gameHistory.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = '履歴はありません。';
+                li.classList.add('text-gray-500');
+                historyList.appendChild(li);
+                return;
+            }
+            gameHistory.forEach(result => {
+                const li = document.createElement('li');
+                li.textContent = result.map((rank, index) => `レース${index + 1}: ${rank}人気`).join(', ');
+                li.classList.add('text-gray-700', 'mb-1'); // Add some bottom margin
+                historyList.appendChild(li);
+            });
+        }
+
+        function addResultToHistory(result) {
+            gameHistory.unshift(result); // Add to the beginning
+            // Limit history to MAX_HISTORY_ITEMS
+            if (gameHistory.length > MAX_HISTORY_ITEMS) {
+                gameHistory.splice(MAX_HISTORY_ITEMS); // Remove items from the end
+            }
+            saveHistory();
+            renderHistory();
+        }
 
         // --- スロット演出関数 ---
         function startSlotsRolling() {
@@ -338,6 +405,7 @@
                             if (index === NUM_RACES - 1) {
                                 setTimeout(() => {
                                     resultMessage.textContent = `の馬を購入してください。`;
+                                    addResultToHistory(outcome.result); // Add to history
                                     generateButton.disabled = false;
                                     generateButton.classList.remove('button-loading');
                                     buttonText.textContent = '人気順を生成';
@@ -350,6 +418,20 @@
                 }
             }, 500);
         });
+
+        // --- History Toggle Event Listener ---
+        toggleHistoryButton.addEventListener('click', () => {
+            historyList.classList.toggle('hidden');
+            if (historyList.classList.contains('hidden')) {
+                toggleHistoryButton.textContent = '履歴を表示';
+            } else {
+                toggleHistoryButton.textContent = '履歴を隠す';
+            }
+        });
+
+        // --- Initial Load ---
+        loadHistory();
+        renderHistory(); // Render initially, will be hidden by default CSS
 
     </script>
 
