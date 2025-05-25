@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>単発レース予想ゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html { 
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #horses-table tbody tr:hover {
+            background-color: #f9fafb; 
+        }
+        .selected-row-bg {
+            background-color: #FEF0EF !important; 
+        }
+        #race-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        #race-log::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #race-log::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        #race-log::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        #race-track-container {
+            background-color: #c6f6d5; 
+            border: 3px solid #38a169; 
+            position: relative; 
+            overflow: hidden; 
+        }
+        .horse-emoji-runner { 
+            position: absolute;
+            font-size: 1.8rem; 
+            white-space: nowrap; 
+            display: flex; 
+            align-items: center;
+        }
+        .result-horse-display-lane { 
+            position: absolute;
+            white-space: nowrap;
+            left: 15px; 
+            padding: 4px 8px; 
+            border-radius: 6px; 
+            display: flex; 
+            align-items: center; 
+        }
+        .horse-emoji-display { 
+             font-size: 1.5rem; 
+        }
+        .horse-name-display { 
+            display: inline-block;
+            margin-left: 5px;
+            font-size: 0.75rem; 
+            vertical-align: middle;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-radius: 4px;
+            color: inherit; 
+        }
+        .race-horse-name-bg { 
+             background-color: rgba(229, 231, 235, 0.7);
+        }
+        .selected-horse-race-name-bg { 
+            background-color: #FEF0EF !important;
+        }
+        .result-horse-display-lane .horse-name-display { 
+            background-color: transparent !important; 
+            margin-left: 3px; 
+        }
+        .rank-display { 
+            font-size: 0.75rem; 
+            font-weight: bold;
+            margin-right: 8px; 
+            color: #000000; 
+        }
+        .goal-line {
+            position: absolute;
+            left: 10px; 
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background-color: red;
+        }
+        .crown-emoji {
+            color: #000000; 
+            margin-left: 3px; 
+            margin-right: 3px; 
+            font-size: 1.1em; 
+            line-height: 1; 
+        }
+        #horses-table {
+            border-collapse: collapse;
+            width: 100%; 
+        }
+        #horses-table th, #horses-table td {
+            border: 1px solid #D9D8CE; 
+            height: 40px; 
+            padding: 8px; 
+            vertical-align: middle; 
+            text-align: center; 
+        }
+        #horses-table th.text-left, #horses-table td.text-left {
+            text-align: left; 
+        }
+        .custom-checkbox-label { 
+            display: inline-block;
+            width: 22px;
+            height: 22px;
+            background-color: #e9e9e9; 
+            border-bottom: 1px solid #d1d1d1; 
+            border-radius: 2px; 
+            position: relative;
+            vertical-align: middle;
+            cursor: pointer;
+            transition: background-color 0.1s ease-in-out;
+        }
+        .custom-checkbox-label::before {
+             content: '';
+             position: absolute;
+             top: 50%;
+             left: 50%;
+             width: 12px; 
+             height: 12px; 
+             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23D1D1D1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>');
+             background-size: cover;
+             transform: translate(-50%, -50%); 
+             opacity: 1; 
+             transition: opacity 0.1s ease-in-out; 
+        }
+        input[type="checkbox"]:checked + .custom-checkbox-label {
+             background-color: #E16363; 
+         }
+         input[type="checkbox"]:checked + .custom-checkbox-label::before {
+              background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>');
+               opacity: 1; 
+         }
+         input[type="checkbox"]:disabled + .custom-checkbox-label {
+             opacity: 0.6; 
+             cursor: not-allowed; 
+         }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+
+    <div class="bg-white p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-2xl mt-8 mb-8">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">単発レース予想ゲーム</h1>
+            <p class="text-gray-600 mt-2">1着になる馬を予想しよう！</p>
+        </header>
+
+        <div id="game-area">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-gray-700 mb-3">出走馬 (1頭選んでください)</h2>
+                <table id="horses-table">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">馬番</th>
+                            <th scope="col" class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">印</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">馬名</th>
+                            <th scope="col" class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">人気</th>
+                        </tr>
+                    </thead>
+                    <tbody id="horses-container" class="divide-y divide-gray-200"> 
+                        </tbody>
+                </table>
+            </div>
+
+            <div id="race-track-container" class="mb-6 p-4 rounded-lg shadow-inner" style="display: none; height: 200px;">
+                <div class="goal-line"></div>
+                </div>
+
+            <div class="text-center mb-6">
+                <button id="start-race-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                    レース開始！
+                </button>
+            </div>
+
+            <div id="results-area" class="mb-4" style="display: none;">
+                <h2 class="text-xl font-semibold text-gray-700 mb-3">レース結果</h2>
+                <div id="race-log" class="bg-gray-50 p-4 rounded-lg shadow h-32 sm:h-40 overflow-y-auto text-sm text-gray-700 space-y-2">
+                    </div>
+                <p id="player-outcome" class="text-center text-lg font-semibold mt-4"></p>
+            </div>
+
+            <div class="text-center">
+                <button id="play-again-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition duration-150 ease-in-out" style="display: none;">
+                    もう一度遊ぶ
+                </button>
+            </div>
+        </div>
+    </div>
+    <div style="height: 50vh;"></div>
+
+    <script>
+        // DOM Elements
+        const horsesTableBody = document.getElementById('horses-container'); 
+        const startRaceBtn = document.getElementById('start-race-btn');
+        const resultsArea = document.getElementById('results-area');
+        const raceLogEl = document.getElementById('race-log');
+        const playerOutcomeEl = document.getElementById('player-outcome');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const raceTrackContainer = document.getElementById('race-track-container');
+        
+        // Constants
+        const GOAL_LINE_LEFT_OFFSET = 10; 
+        const HORSE_EMOJI = "🏇";
+        const CROWN_EMOJI = "👑";
+        const horseAssignedColors = ['#FFFFFF', '#222222', '#DC3B3B', '#2B53A8']; 
+        const colorNames = ['白', '黒', '赤', '青']; 
+        const resultBackgroundColors = { 
+            1: '#FEF07F', 
+            2: '#CCDEFF', 
+            3: '#F0C7A0', 
+            4: '#F5F4F0'
+        };
+        const DEFAULT_ROW_BG_CLASS = 'bg-white'; 
+        const SELECTED_ROW_BG_COLOR = '#FEF0EF'; 
+
+        // ★★★ 馬名と強さのデータをJSON文字列として定義 ★★★
+        const horseNameDataJson = `
+        {
+            "prefixes": [
+                {"name": "ディープ", "strength": 5},
+                {"name": "シンボリ", "strength": 5},
+                {"name": "トウカイ", "strength": 3},
+                {"name": "オグリ", "strength": 5},
+                {"name": "タイキ", "strength": 4},
+                {"name": "キング", "strength": 2},
+                {"name": "ゴールド", "strength": 3},
+                {"name": "ダイワ", "strength": 3},
+                {"name": "メジロ", "strength": 2},
+                {"name": "スペシャル", "strength": 4}
+            ],
+            "suffixes": [
+                {"name": "インパクト", "strength": 5},
+                {"name": "ルドルフ", "strength": 5},
+                {"name": "テイオー", "strength": 4},
+                {"name": "キャップ", "strength": 5},
+                {"name": "シャトル", "strength": 4},
+                {"name": "シップ", "strength": 4},
+                {"name": "ブラック", "strength": 4},
+                {"name": "スカーレット", "strength": 4},
+                {"name": "ウィーク", "strength": 4},
+                {"name": "スズカ", "strength": 4}
+            ],
+            "defaultPartStrength": 2 
+        }
+        `;
+        const horseNameData = JSON.parse(horseNameDataJson); // JSONをパース
+
+        const STRENGTH_RANDOM_VARIATION = 2; 
+        const MIN_STRENGTH = 1;
+        const MAX_STRENGTH = 10;
+
+        // Game State
+        let horses = [];
+        let selectedHorseName = null;
+        let gameInProgress = false;
+        let animationFrameId = null;
+        let horseRunners = [];
+
+        // Helper Functions
+        function isLightColor(hexColor) {
+            return hexColor.toUpperCase() === '#FFFFFF';
+        }
+
+        function updateCustomCheckboxAppearance() {
+            document.querySelectorAll('input[type="checkbox"][name="selectedHorse"]').forEach(checkbox => {
+                const label = document.querySelector(`label[for="${checkbox.id}"]`);
+                const row = checkbox.closest('tr');
+                if (label && row) {
+                    if (checkbox.checked) {
+                        label.classList.add('checked');
+                        row.style.backgroundColor = SELECTED_ROW_BG_COLOR;
+                    } else {
+                        label.classList.remove('checked');
+                        row.style.backgroundColor = ''; 
+                    }
+                    if (checkbox.disabled) {
+                        label.classList.add('disabled');
+                        row.classList.add('opacity-50'); 
+                    } else {
+                        label.classList.remove('disabled');
+                        row.classList.remove('opacity-50');
+                    }
+                }
+            });
+        }
+        
+        function generateUniqueHorseName(existingNames, existingPrefixes, existingSuffixes) {
+            let name = null;
+            let attempts = 0;
+            const maxAttempts = 200;
+            let selectedPrefixData = null;
+            let selectedSuffixData = null;
+
+            while (attempts < maxAttempts) {
+                const availablePrefixes = horseNameData.prefixes.filter(p => !existingPrefixes.has(p.name));
+                selectedPrefixData = availablePrefixes.length > 0 
+                    ? availablePrefixes[Math.floor(Math.random() * availablePrefixes.length)]
+                    : horseNameData.prefixes[Math.floor(Math.random() * horseNameData.prefixes.length)]; 
+
+                const availableSuffixes = horseNameData.suffixes.filter(s => !existingSuffixes.has(s.name));
+                selectedSuffixData = availableSuffixes.length > 0
+                    ? availableSuffixes[Math.floor(Math.random() * availableSuffixes.length)]
+                    : horseNameData.suffixes[Math.floor(Math.random() * horseNameData.suffixes.length)]; 
+                
+                name = selectedPrefixData.name + selectedSuffixData.name;
+
+                if (!existingNames.has(name) && name.length <= 9) { // 9文字制限は例
+                    existingPrefixes.add(selectedPrefixData.name); 
+                    existingSuffixes.add(selectedSuffixData.name);
+                    return { name, prefixData: selectedPrefixData, suffixData: selectedSuffixData };
+                }
+                attempts++;
+            }
+            console.warn("Failed to generate a fully unique horse name. Using fallback.");
+            let fallbackName = `馬${existingNames.size + 1}`;
+            let i = 1;
+            while(existingNames.has(fallbackName)) { fallbackName = `馬${existingNames.size + 1 + i++}`; }
+            // フォールバック時は prefixData, suffixData も null またはデフォルト値を持つオブジェクトを返す
+            return { 
+                name: fallbackName, 
+                prefixData: { name: "フォール", strength: horseNameData.defaultPartStrength }, 
+                suffixData: { name: "バック", strength: horseNameData.defaultPartStrength } 
+            };
+        }
+
+
+        // Main Game Logic Functions
+        function initGame() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            horses = generateHorses(4);
+            assignPopularity(horses);
+            displayHorses(); 
+            selectedHorseName = null;
+            startRaceBtn.disabled = true; 
+            resultsArea.style.display = 'none';
+            raceTrackContainer.style.display = 'none';
+            raceTrackContainer.innerHTML = `<div class="goal-line" style="left: ${GOAL_LINE_LEFT_OFFSET}px;"></div>`;
+            playAgainBtn.style.display = 'none';
+            raceLogEl.innerHTML = '';
+            playerOutcomeEl.textContent = '';
+            gameInProgress = false;
+            enableHorseSelection();
+            horseRunners = [];
+        }
+
+        function generateHorses(count) {
+            const generatedHorses = [];
+            const namesInUse = new Set();
+            const usedPrefixes = new Set(); // 使用済み接頭辞名を管理
+            const usedSuffixes = new Set(); // 使用済み接尾辞名を管理
+
+            for (let i = 0; i < count; i++) {
+                const nameData = generateUniqueHorseName(namesInUse, usedPrefixes, usedSuffixes);
+                if (!nameData || !nameData.name) {
+                    console.error(`Could not generate a valid name for horse ${i}. Skipping.`);
+                    continue; 
+                }
+                namesInUse.add(nameData.name);
+
+                const prefixStrength = nameData.prefixData.strength;
+                const suffixStrength = nameData.suffixData.strength;
+                const totalBaseStrength = prefixStrength + suffixStrength;
+
+                const randomVariation = Math.floor(Math.random() * (STRENGTH_RANDOM_VARIATION * 2 + 1)) - STRENGTH_RANDOM_VARIATION;
+                let calculatedStrength = totalBaseStrength + randomVariation;
+                calculatedStrength = Math.max(MIN_STRENGTH, Math.min(MAX_STRENGTH, calculatedStrength));
+
+                generatedHorses.push({
+                    id: `horse-${i}`,
+                    name: nameData.name,
+                    strength: calculatedStrength,
+                    emoji: HORSE_EMOJI,
+                    assignedColor: horseAssignedColors[i % horseAssignedColors.length], 
+                    colorName: colorNames[i % colorNames.length], 
+                    position: 0, 
+                    finished: false, 
+                    rank: 0,
+                    finishedCompletely: false, 
+                    resultDisplayed: false 
+                });
+            }
+            return generatedHorses;
+        }
+
+        function assignPopularity(horses) {
+            const sortedHorses = [...horses].sort((a, b) => b.strength - a.strength);
+            sortedHorses.forEach((horse, index) => {
+                const originalHorse = horses.find(h => h.id === horse.id);
+                if (originalHorse) {
+                    originalHorse.popularity = index + 1;
+                }
+            });
+        }
+
+        function displayHorses() {
+            horsesTableBody.innerHTML = ''; 
+            horses.forEach((horse, index) => {
+                const row = document.createElement('tr');
+                row.classList.add(DEFAULT_ROW_BG_CLASS); 
+
+                const numberCell = document.createElement('td');
+                numberCell.textContent = index + 1;
+                numberCell.style.backgroundColor = horse.assignedColor;
+                numberCell.style.color = isLightColor(horse.assignedColor) ? '#222222' : '#FFFFFF';
+                numberCell.classList.add('font-bold');
+                row.appendChild(numberCell);
+
+                const checkboxCell = document.createElement('td');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `select-${horse.id}`;
+                checkbox.name = 'selectedHorse';
+                checkbox.value = horse.name;
+                checkbox.className = 'hidden';
+
+                const customCheckboxLabel = document.createElement('label');
+                customCheckboxLabel.htmlFor = `select-${horse.id}`;
+                customCheckboxLabel.className = 'custom-checkbox-label';
+
+                checkbox.addEventListener('change', function() {
+                    if (gameInProgress) return;
+                    
+                    document.querySelectorAll('#horses-container tr').forEach(r => {
+                        r.style.backgroundColor = ''; 
+                    });
+                    document.querySelectorAll('input[name="selectedHorse"]').forEach(otherCheckbox => {
+                        if (otherCheckbox !== this) {
+                            otherCheckbox.checked = false;
+                        }
+                    });
+
+                    if (this.checked) {
+                        selectedHorseName = this.value;
+                        startRaceBtn.disabled = false;
+                        row.style.backgroundColor = SELECTED_ROW_BG_COLOR; 
+                    } else {
+                        selectedHorseName = null;
+                        startRaceBtn.disabled = true;
+                    }
+                    updateCustomCheckboxAppearance();
+                });
+                checkboxCell.appendChild(checkbox);
+                checkboxCell.appendChild(customCheckboxLabel);
+                row.appendChild(checkboxCell);
+
+                const nameCell = document.createElement('td');
+                nameCell.className = 'text-left';
+                nameCell.textContent = horse.name;
+                nameCell.style.color = horse.assignedColor;
+                if (isLightColor(horse.assignedColor)) {
+                    nameCell.style.textShadow = '-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black';
+                } else {
+                    nameCell.style.textShadow = 'none';
+                }
+                row.appendChild(nameCell);
+
+                const popularityCell = document.createElement('td');
+                popularityCell.textContent = horse.popularity;
+                row.appendChild(popularityCell);
+
+                horsesTableBody.appendChild(row);
+            });
+            updateCustomCheckboxAppearance();
+        }
+        
+        function setupRaceTrack() {
+            raceTrackContainer.style.display = 'block';
+            const goalLineEl = raceTrackContainer.querySelector('.goal-line');
+            raceTrackContainer.innerHTML = '';
+            if (goalLineEl) raceTrackContainer.appendChild(goalLineEl);
+
+            horseRunners = []; 
+
+            horses.forEach((horse, index) => {
+                const runnerEl = document.createElement('div');
+                runnerEl.id = horse.id;
+                runnerEl.className = 'horse-emoji-runner'; 
+                
+                const emojiSpan = document.createElement('span');
+                emojiSpan.style.color = horse.assignedColor; 
+                emojiSpan.textContent = horse.emoji; 
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'horse-name-display race-horse-name-bg'; 
+                nameSpan.textContent = horse.name; 
+                nameSpan.style.color = horse.assignedColor; 
+                if (isLightColor(horse.assignedColor)) {
+                    nameSpan.style.textShadow = '-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black';
+                } else {
+                    nameSpan.style.textShadow = 'none';
+                }
+
+                if (horse.name === selectedHorseName) {
+                    nameSpan.classList.add('selected-horse-race-name-bg');
+                } else {
+                    nameSpan.classList.remove('selected-horse-race-name-bg'); 
+                }
+
+                runnerEl.appendChild(emojiSpan);
+                runnerEl.appendChild(nameSpan);
+                
+                const topPosition = index * 45 + 10; 
+                runnerEl.style.top = `${topPosition}px`; 
+                
+                raceTrackContainer.appendChild(runnerEl);
+                const actualWidth = runnerEl.offsetWidth; 
+                const initialOffset = actualWidth + 20; 
+                runnerEl.style.right = `-${initialOffset}px`; 
+
+
+                horseRunners.push({ 
+                    ...horse, 
+                    element: runnerEl, 
+                    currentPos: -initialOffset, 
+                    actualWidth: actualWidth,
+                    finishedCompletely: false,
+                    resultDisplayed: false,
+                    laneTopPosition: topPosition 
+                });
+            });
+             const containerWidth = raceTrackContainer.clientWidth;
+             horseRunners.forEach(runner => {
+                runner.goalRightPosForFinish = containerWidth - GOAL_LINE_LEFT_OFFSET - runner.actualWidth;
+             });
+        }
+        
+        function renderStaticResult(runner) {
+            runner.element.style.display = 'none'; 
+
+            const resultDisplayEl = document.createElement('div');
+            resultDisplayEl.className = 'result-horse-display-lane'; 
+            resultDisplayEl.style.top = `${runner.laneTopPosition}px`; 
+            resultDisplayEl.style.backgroundColor = resultBackgroundColors[runner.rank] || '#F5F4F0'; 
+
+            const rankSpan = document.createElement('span');
+            rankSpan.className = 'rank-display'; 
+            rankSpan.textContent = `${runner.rank}着:`;
+            resultDisplayEl.appendChild(rankSpan);
+            
+            const horseEmojiSpan = document.createElement('span');
+            horseEmojiSpan.className = 'horse-emoji-display';
+            horseEmojiSpan.textContent = runner.emoji;
+            resultDisplayEl.appendChild(horseEmojiSpan);
+
+            if (runner.rank === 1) {
+                const crownSpan = document.createElement('span');
+                crownSpan.className = 'crown-emoji'; 
+                crownSpan.textContent = CROWN_EMOJI;
+                resultDisplayEl.appendChild(crownSpan);
+            }
+
+            const horseNameSpan = document.createElement('span');
+            horseNameSpan.className = 'horse-name-display'; 
+            horseNameSpan.textContent = runner.name; 
+            horseNameSpan.style.color = runner.assignedColor; 
+            if (isLightColor(runner.assignedColor)) {
+                horseNameSpan.style.textShadow = '-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black';
+            } else {
+                horseNameSpan.style.textShadow = 'none';
+            }
+            resultDisplayEl.appendChild(horseNameSpan);
+            
+            raceTrackContainer.appendChild(resultDisplayEl);
+            runner.resultDisplayed = true;
+        }
+
+
+        function startRace() {
+            if (!selectedHorseName) {
+                console.warn("馬が選択されていません。");
+                const outcomeEl = document.getElementById('player-outcome');
+                if(outcomeEl) {
+                    outcomeEl.textContent = "レースを開始するには、まず馬を選んでください。";
+                    outcomeEl.className = "text-center text-lg font-semibold mt-4 text-yellow-500";
+                    resultsArea.style.display = 'block'; 
+                }
+                return;
+            }
+            gameInProgress = true;
+            startRaceBtn.disabled = true;
+            disableHorseSelection();
+            resultsArea.style.display = 'block'; 
+            raceLogEl.innerHTML = ''; 
+            playerOutcomeEl.textContent = '';
+
+            setupRaceTrack(); 
+
+            raceTrackContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            addLogMessage("レース開始！各馬一斉にスタート！");
+            let currentRank = 1;
+
+            function raceStep() {
+                const trackClientWidth = raceTrackContainer.clientWidth;
+
+                horseRunners.forEach(runner => { 
+                    if (!runner.finishedCompletely) {
+                        const moveDistance = (runner.strength / 7) + (Math.random() * 0.5);
+                        runner.currentPos += moveDistance;
+                        runner.element.style.right = `${runner.currentPos}px`;
+
+                        if (runner.currentPos > trackClientWidth + runner.actualWidth + 50) { 
+                            runner.finishedCompletely = true;
+                            runner.element.style.display = 'none'; 
+                        }
+                    }
+
+                    if (runner.currentPos >= runner.goalRightPosForFinish && !runner.finished) {
+                        runner.finished = true; 
+                        runner.rank = currentRank;
+                        addLogMessage(`${currentRank}着: ${runner.emoji} ${runner.name} ゴール！`, runner.assignedColor);
+                        
+                        if (!runner.resultDisplayed) {
+                           renderStaticResult(runner); 
+                        }
+                        currentRank++;
+                    }
+                });
+                
+                const allRanked = horseRunners.every(hr => hr.finished);
+                const allVisuallyOffScreen = horseRunners.every(hr => hr.finishedCompletely); 
+
+                if (allRanked && allVisuallyOffScreen) { 
+                    finalizeRace();
+                } else {
+                    animationFrameId = requestAnimationFrame(raceStep);
+                }
+            }
+            animationFrameId = requestAnimationFrame(raceStep);
+        }
+
+        function finalizeRace() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null; 
+            }
+            addLogMessage("--- 全ての馬がゴールしました ---");
+
+            const winner = horseRunners.find(h => h.rank === 1); 
+            if (winner) { 
+                 if (winner.name === selectedHorseName) {
+                    playerOutcomeEl.textContent = `🎉 おめでとうございます！ ${winner.emoji} ${winner.name} が1着！予想的中です！ 🎉`; 
+                    playerOutcomeEl.className = "text-center text-xl font-bold mt-4 text-green-500";
+                } else {
+                    const playerHorse = horseRunners.find(h => h.name === selectedHorseName);
+                    const playerRank = playerHorse ? `${playerHorse.rank}着` : 'ランク外';
+                    playerOutcomeEl.textContent = `残念！1着は ${winner.emoji} ${winner.name} でした。あなたの予想した ${selectedHorseName} は${playerRank}でした。`; 
+                    playerOutcomeEl.className = "text-center text-xl font-bold mt-4 text-red-500";
+                }
+            } else { 
+                 playerOutcomeEl.textContent = "レース結果の判定に問題がありました。";
+                 playerOutcomeEl.className = "text-center text-xl font-bold mt-4 text-yellow-500";
+            }
+
+            playAgainBtn.style.display = 'inline-block';
+            gameInProgress = false; 
+        }
+
+        function addLogMessage(message, horseColor = '#333') { 
+            const p = document.createElement('p');
+            p.textContent = message; 
+            p.style.color = horseColor; 
+            if (isLightColor(horseColor)) {
+                 p.style.textShadow = '0 0 2px black, 0 0 2px black'; 
+            } else {
+                p.style.textShadow = 'none';
+            }
+            raceLogEl.appendChild(p);
+            raceLogEl.scrollTop = raceLogEl.scrollHeight;
+        }
+        
+        function disableHorseSelection() {
+            document.querySelectorAll('input[name="selectedHorse"]').forEach(checkbox => {
+                checkbox.disabled = true;
+            });
+            updateCustomCheckboxAppearance(); 
+        }
+
+        function enableHorseSelection() {
+             document.querySelectorAll('input[name="selectedHorse"]').forEach(checkbox => {
+                checkbox.disabled = false;
+            });
+            updateCustomCheckboxAppearance(); 
+        }
+
+        startRaceBtn.addEventListener('click', startRace);
+        playAgainBtn.addEventListener('click', initGame);
+
+        initGame();
+    </script>
+</body>
+</html>
